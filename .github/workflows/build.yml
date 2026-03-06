@@ -1,0 +1,60 @@
+name: Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin-x64
+            arch: x64
+          - os: macos-latest
+            target: darwin-arm64
+            arch: arm64
+          - os: ubuntu-latest
+            target: linux-x64
+            arch: x64
+          - os: ubuntu-latest
+            target: linux-arm64
+            arch: arm64
+          - os: windows-latest
+            target: windows-x64
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.target }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: bun build ./src/index.ts --compile --target=bun-${{ matrix.target }} --outfile willhaben-${{ matrix.target }}
+
+      - name: Build binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: bun build ./src/index.ts --compile --target=bun-${{ matrix.target }} --outfile willhaben-${{ matrix.target }}.exe
+
+      - name: Upload artifact (Unix)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: willhaben-${{ matrix.target }}
+          path: willhaben-${{ matrix.target }}
+
+      - name: Upload artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: willhaben-${{ matrix.target }}
+          path: willhaben-${{ matrix.target }}.exe
