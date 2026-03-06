@@ -1,0 +1,5 @@
+[install]
+auto = "force"
+
+[run]
+bun = true
