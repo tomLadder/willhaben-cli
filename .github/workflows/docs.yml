@@ -38,7 +38,7 @@ jobs:
         run: bun install
 
       - name: Build with VitePress
-        run: npx vitepress build docs
+        run: bun run docs:build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
