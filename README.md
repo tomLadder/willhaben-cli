@@ -9,15 +9,16 @@
 </p>
 
 <p align="center">
+  <a href="https://tomladder.github.io/willhaben-cli/">📖 Documentation</a> •
   <a href="#features">Features</a> •
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#commands">Commands</a> •
-  <a href="#configuration">Configuration</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
 <p align="center">
+  <a href="https://tomladder.github.io/willhaben-cli/"><img src="https://img.shields.io/badge/docs-online-03A4E8.svg" alt="Documentation"></a>
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/bun-%3E%3D1.0-black.svg" alt="Bun">
@@ -74,7 +75,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/willhaben/willhaben-cli.git
+git clone https://github.com/tomLadder/willhaben-cli.git
 cd willhaben-cli
 
 # Install dependencies
@@ -446,7 +447,7 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 ```bash
 # Clone and install
-git clone https://github.com/willhaben/willhaben-cli.git
+git clone https://github.com/tomLadder/willhaben-cli.git
 cd willhaben-cli
 bun install
 
