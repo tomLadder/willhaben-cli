@@ -1,8 +1,18 @@
 # Installation
 
-## Prerequisites
+## Quick Install (macOS / Linux)
 
-- [Bun](https://bun.sh) v1.0 or higher
+```bash
+curl -fsSL https://raw.githubusercontent.com/tomLadder/willhaben-cli/main/install.sh | sh
+```
+
+This will automatically detect your OS and architecture, download the latest release binary, and install it to `/usr/local/bin`.
+
+## GitHub Releases
+
+Pre-built binaries for macOS, Linux, and Windows are available on the [Releases page](https://github.com/tomLadder/willhaben-cli/releases).
+
+Download the binary for your platform, make it executable (`chmod +x`), and move it to a directory in your `PATH`.
 
 ## From Source
 

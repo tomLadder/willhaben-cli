@@ -11,6 +11,14 @@ willhaben-cli is a command-line tool for creating and managing listings on willh
 1. User must have a willhaben.at account
 2. User must be logged in: `willhaben login`
 
+## Installation
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tomLadder/willhaben-cli/main/install.sh | sh
+```
+
+Pre-built binaries are also available on the [Releases page](https://github.com/tomLadder/willhaben-cli/releases).
+
 ## Authentication
 
 ```bash
