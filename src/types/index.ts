@@ -47,7 +47,7 @@ export interface Listing {
   currency: string;
   category: string;
   categoryId: number;
-  status: "active" | "inactive" | "expired" | "deleted";
+  status: "active" | "inactive" | "expired" | "deleted" | "draft";
   images: ListingImage[];
   attributes: ListingAttribute[];
   location?: {

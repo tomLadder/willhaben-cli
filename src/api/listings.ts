@@ -378,6 +378,7 @@ interface CreateAdResponse {
 }
 
 export interface PublishListingOptions {
+  draft?: boolean; // Save without activating; defaults to publishing
   title: string;
   description: string;
   price: number;
@@ -574,19 +575,21 @@ export async function createListing(
 
   const adId = saveResponse.data.adId;
 
-  // Step 2: Activate/publish the draft (uses PUT)
-  const activateResponse = await apiClient.put<CreateAdResponse>(
-    ENDPOINTS.publish(adId.toString())
-  );
+  // Step 2: Activate/publish unless only a draft was requested (uses PUT)
+  if (!options.draft) {
+    const activateResponse = await apiClient.put<CreateAdResponse>(
+      ENDPOINTS.publish(adId.toString())
+    );
 
-  if (!activateResponse.success) {
-    return {
-      success: false,
-      error: activateResponse.error || {
-        code: "ACTIVATE_FAILED",
-        message: `Draft created (ID: ${adId}) but failed to publish`,
-      },
-    };
+    if (!activateResponse.success) {
+      return {
+        success: false,
+        error: activateResponse.error || {
+          code: "ACTIVATE_FAILED",
+          message: `Draft created (ID: ${adId}) but failed to publish`,
+        },
+      };
+    }
   }
 
   // Return the created listing
@@ -598,7 +601,7 @@ export async function createListing(
     currency: "EUR",
     category: options.categoryPath[options.categoryPath.length - 1] || "Unknown",
     categoryId: 67,
-    status: "active",
+    status: options.draft ? "draft" : "active",
     images: [],
     attributes: [],
     createdAt: new Date().toISOString(),

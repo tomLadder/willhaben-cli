@@ -19,6 +19,17 @@ willhaben publish <file> [options]
 | Option | Description |
 |--------|-------------|
 | `--json` | Output as JSON |
+| `--draft` | Save a draft without activating/publishing it |
+
+Without `--draft`, this command saves and then activates the listing as before.
+With `--draft`, it only saves the draft; the returned JSON and local cache use
+`"status": "draft"`, and the success message is `Draft saved successfully!`.
+Drafts still require authentication and the same template validation.
+
+```bash
+willhaben publish my-item.json --draft
+willhaben publish my-item.json --draft --json
+```
 
 ## Template Format
 

@@ -211,9 +211,10 @@ export function registerListingCommands(program: Command): void {
         process.exit(1);
       }
 
-      const spinner = ora("Publishing listing...").start();
+      const spinner = ora(opts.draft ? "Saving draft..." : "Publishing listing...").start();
 
       const publishOptions: PublishListingOptions = {
+        draft: opts.draft,
         title: template.title,
         description: template.description,
         price: template.price,
@@ -232,7 +233,7 @@ export function registerListingCommands(program: Command): void {
       const result = await createListing(publishOptions, userInfo);
 
       if (result.success && result.data) {
-        spinner.succeed(chalk.green("Listing published successfully!"));
+        spinner.succeed(chalk.green(result.data.status === "draft" ? "Draft saved successfully!" : "Listing published successfully!"));
 
         if (opts.json) {
           console.log(JSON.stringify(result.data, null, 2));
@@ -242,7 +243,7 @@ export function registerListingCommands(program: Command): void {
           console.log(`  Price: ${chalk.green(`€ ${result.data.price}`)}`);
         }
       } else {
-        spinner.fail(chalk.red("Failed to publish listing"));
+        spinner.fail(chalk.red(opts.draft ? "Failed to save draft" : "Failed to publish listing"));
         console.error(
           chalk.red(result.error?.message || "Unknown error occurred")
         );

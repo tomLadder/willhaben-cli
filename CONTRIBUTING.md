@@ -48,6 +48,9 @@ bun install
 # Run in development mode
 bun run dev -- --help
 
+# Run offline regression tests (synthetic auth, mocked network and cache)
+bun test
+
 # Type check
 bun run typecheck
 

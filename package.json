@@ -8,6 +8,7 @@
     "willhaben": "./src/index.ts"
   },
   "scripts": {
+    "test": "bun test",
     "dev": "bun run src/index.ts",
     "build": "bun build ./src/index.ts --compile --outfile willhaben",
     "typecheck": "tsc --noEmit",
