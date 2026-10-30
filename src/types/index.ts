@@ -90,9 +90,9 @@ export interface ListingTemplate {
   // Optional attributes
   condition?: "neu" | "gebraucht" | "defekt";
   delivery?: ("PICKUP" | "Versand")[];
+  images?: string[]; // Image file paths, relative to the template file
   // Legacy fields (kept for compatibility)
   categoryId?: number;
-  images?: string[]; // File paths or URLs
   attributes?: Record<string, string | string[]>;
   contactInfo?: {
     name?: string;

@@ -96,6 +96,7 @@ Create a JSON file with the listing details:
 | `locationId` | number | Location id, looked up automatically from `postCode` + `location` |
 | `condition` | string | `"neu"`, `"gebraucht"`, or `"defekt"` |
 | `delivery` | string[] | `["PICKUP"]`, `["Versand"]`, or both |
+| `images` | string[] | Image files (jpg, png, gif, webp), relative to the template file. First is the cover |
 | `street` | string | Street address |
 | `attributes` | object | Category-specific attributes |
 | `contactInfo.name` | string | Contact name override |
@@ -112,15 +113,24 @@ willhaben locations 8010 --json
 
 ### Step 3: Publish the Listing
 
+`publish` saves a draft, uploads the template's `images`, then puts the listing live. If an image upload fails, the listing stays a draft and the error contains its ID.
+
 ```bash
 # Publish from template file
 willhaben publish listing.json
+
+# Save as draft only, so the user can review it in the willhaben app first
+willhaben publish listing.json --draft
+# ...then put it live
+willhaben activate <listing-id>
 
 # Output as JSON (for programmatic use)
 willhaben publish listing.json --json
 ```
 
-### Step 4: Upload Images
+Prefer `--draft` when the user hasn't explicitly asked to publish right away.
+
+### Step 4: Manage Images Later
 
 ```bash
 # Upload single image
@@ -158,6 +168,9 @@ willhaben update <listing-id> --description "Updated description"
 # Delete listing
 willhaben delete <listing-id>
 willhaben delete <listing-id> --force  # Skip confirmation
+
+# Put a draft live
+willhaben activate <listing-id>
 
 # Deactivate (take offline temporarily)
 willhaben deactivate <listing-id>
@@ -215,15 +228,16 @@ cat > listing.json << 'EOF'
   "postCode": "8010",
   "location": "Jakomini",
   "condition": "gebraucht",
-  "delivery": ["PICKUP", "Versand"]
+  "delivery": ["PICKUP", "Versand"],
+  "images": ["buch_cover.jpg", "buch_rueckseite.jpg"]
 }
 EOF
 
-# 5. Publish
-willhaben publish listing.json
+# 5. Save as draft with images, let the user review it in the app
+willhaben publish listing.json --draft
 
-# 6. Upload images (use listing ID from publish output)
-willhaben upload-image <listing-id> buch_cover.jpg buch_rueckseite.jpg
+# 6. Put it live (use listing ID from publish output)
+willhaben activate <listing-id>
 ```
 
 ## JSON Output Mode

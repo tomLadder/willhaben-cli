@@ -31,6 +31,7 @@ Quick reference for all willhaben-cli commands.
 
 | Command | Description |
 |---------|-------------|
+| `activate <id>` | Put a draft live |
 | `republish <id>` | Republish an expired listing |
 | `deactivate <id>` | Take a listing offline |
 | `reserve <id>` | Mark as reserved |

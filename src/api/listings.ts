@@ -399,6 +399,10 @@ export interface PublishListingOptions {
   attributes?: Record<string, string | string[]>;
   // Skip attribute validation (not recommended)
   skipValidation?: boolean;
+  // Image file paths, uploaded before the listing goes live
+  images?: string[];
+  // Keep the listing as a draft instead of putting it live
+  draft?: boolean;
 }
 
 // Cached category tree for validation
@@ -577,34 +581,54 @@ export async function createListing(
     };
   }
 
-  const adId = saveResponse.data.adId;
+  const adId = saveResponse.data.adId.toString();
 
-  // Step 2: Activate/publish the draft (uses PUT)
-  const activateResponse = await apiClient.put<CreateAdResponse>(
-    ENDPOINTS.publish(adId.toString())
-  );
+  // Step 2: Upload images while it's still a draft, so it never goes live without them
+  let images: Listing["images"] = [];
+  if (options.images && options.images.length > 0) {
+    const uploadResponse = await uploadImages(adId, options.images);
+    if (!uploadResponse.success) {
+      return {
+        success: false,
+        error: {
+          code: "IMAGE_UPLOAD_FAILED",
+          message: `Draft saved (ID: ${adId}) but image upload failed: ${uploadResponse.error?.message ?? "unknown error"}`,
+          details: { adId },
+        },
+      };
+    }
+    images = (uploadResponse.data?.advertImage ?? []).map((img) => ({
+      url: img.mainImageUrl,
+      id: String(img.id),
+    }));
+  }
 
-  if (!activateResponse.success) {
-    return {
-      success: false,
-      error: activateResponse.error || {
-        code: "ACTIVATE_FAILED",
-        message: `Draft created (ID: ${adId}) but failed to publish`,
-      },
-    };
+  // Step 3: Activate/publish the draft (uses PUT)
+  if (!options.draft) {
+    const activateResponse = await activateListing(adId);
+    if (!activateResponse.success) {
+      return {
+        success: false,
+        error: {
+          code: "ACTIVATE_FAILED",
+          message: `Draft saved (ID: ${adId}) but failed to publish: ${activateResponse.error?.message ?? "unknown error"}`,
+          details: { adId },
+        },
+      };
+    }
   }
 
   // Return the created listing
   const listing: Listing = {
-    id: adId.toString(),
+    id: adId,
     title: options.title,
     description: options.description,
     price: options.price,
     currency: "EUR",
     category: options.categoryPath[options.categoryPath.length - 1] || "Unknown",
     categoryId: 67,
-    status: "active",
-    images: [],
+    status: options.draft ? "draft" : "active",
+    images,
     attributes: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -612,6 +636,13 @@ export async function createListing(
 
   await updateCachedListing(listing);
   return { success: true, data: listing };
+}
+
+/**
+ * Put a saved draft live.
+ */
+export async function activateListing(id: string): Promise<ApiResponse<void>> {
+  return apiClient.put<void>(ENDPOINTS.publish(id));
 }
 
 // Response type from GET /bap/{id} for editing

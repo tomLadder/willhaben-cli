@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import { readFile } from "fs/promises";
+import { dirname, resolve } from "path";
 import prompts from "prompts";
 import {
   listMyListings,
@@ -10,6 +11,7 @@ import {
   updateListing,
   deleteListing,
   republishListing,
+  activateListing,
   deactivateListing,
   markListingSold,
   markListingReserved,
@@ -170,7 +172,7 @@ export function registerListingCommands(program: Command): void {
     .command("publish <file>")
     .description("Publish a new listing from a JSON template file")
     .option("--json", "Output as JSON")
-    .option("--draft", "Save as draft without publishing")
+    .option("--draft", "Save as draft without publishing (put it live later with `activate`)")
     .action(async (file: string, opts) => {
       await requireAuth();
 
@@ -213,7 +215,20 @@ export function registerListingCommands(program: Command): void {
         process.exit(1);
       }
 
-      const spinner = ora("Publishing listing...").start();
+      // Image paths are relative to the template file; check them before creating anything
+      const imagePaths = (template.images ?? []).map((image) => resolve(dirname(file), image));
+      for (const imagePath of imagePaths) {
+        if (!(await Bun.file(imagePath).exists())) {
+          console.error(chalk.red(`Image not found: ${imagePath}`));
+          process.exit(1);
+        }
+        if (!/\.(jpe?g|png|gif|webp)$/i.test(imagePath)) {
+          console.error(chalk.red(`Unsupported image type: ${imagePath} (use jpg, png, gif or webp)`));
+          process.exit(1);
+        }
+      }
+
+      const spinner = ora(opts.draft ? "Saving draft..." : "Publishing listing...").start();
 
       let locationId = template.locationId;
       let location = template.location;
@@ -228,7 +243,7 @@ export function registerListingCommands(program: Command): void {
         }
         locationId ??= resolved.data.id;
         location ??= resolved.data.description;
-        spinner.text = "Publishing listing...";
+        spinner.text = opts.draft ? "Saving draft..." : "Publishing listing...";
       }
 
       const publishOptions: PublishListingOptions = {
@@ -245,12 +260,16 @@ export function registerListingCommands(program: Command): void {
         firstName: template.contactInfo?.name,
         attributes: template.attributes,
         skipValidation: template.skipValidation,
+        images: imagePaths,
+        draft: opts.draft,
       };
 
       const result = await createListing(publishOptions, userInfo);
 
       if (result.success && result.data) {
-        spinner.succeed(chalk.green("Listing published successfully!"));
+        spinner.succeed(
+          chalk.green(opts.draft ? "Draft saved, not published yet." : "Listing published successfully!")
+        );
 
         if (opts.json) {
           console.log(JSON.stringify(result.data, null, 2));
@@ -258,9 +277,13 @@ export function registerListingCommands(program: Command): void {
           console.log(`  ID: ${chalk.cyan(result.data.id)}`);
           console.log(`  Title: ${result.data.title}`);
           console.log(`  Price: ${chalk.green(`€ ${result.data.price}`)}`);
+          console.log(`  Images: ${result.data.images.length}`);
+          if (opts.draft) {
+            console.log(chalk.dim(`\nCheck it in the willhaben app, then run \`willhaben activate ${result.data.id}\` to put it live.`));
+          }
         }
       } else {
-        spinner.fail(chalk.red("Failed to publish listing"));
+        spinner.fail(chalk.red(opts.draft ? "Failed to save draft" : "Failed to publish listing"));
         console.error(
           chalk.red(result.error?.message || "Unknown error occurred")
         );
@@ -367,6 +390,27 @@ export function registerListingCommands(program: Command): void {
         }
       } else {
         spinner.fail(chalk.red("Failed to republish listing"));
+        console.error(
+          chalk.red(result.error?.message || "Unknown error occurred")
+        );
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("activate <id>")
+    .description("Put a draft live")
+    .action(async (id: string) => {
+      await requireAuth();
+
+      const spinner = ora("Publishing listing...").start();
+
+      const result = await activateListing(id);
+
+      if (result.success) {
+        spinner.succeed(chalk.green("Listing published successfully!"));
+      } else {
+        spinner.fail(chalk.red("Failed to publish listing"));
         console.error(
           chalk.red(result.error?.message || "Unknown error occurred")
         );

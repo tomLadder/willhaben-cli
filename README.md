@@ -142,7 +142,8 @@ Create a template file `my-item.json`:
   "postCode": "1010",
   "categoryPath": ["MOBILE_ELECTRONICS", "MOBILE_PHONES", "IPHONE"],
   "condition": "gebraucht",
-  "delivery": ["PICKUP", "Versand"]
+  "delivery": ["PICKUP", "Versand"],
+  "images": ["photo1.jpg", "photo2.jpg"]
 }
 ```
 
@@ -150,6 +151,10 @@ Then publish:
 
 ```bash
 willhaben publish my-item.json
+
+# Or save a draft first, check it in the app, then put it live
+willhaben publish my-item.json --draft
+willhaben activate <id>
 ```
 
 ---
@@ -170,9 +175,10 @@ willhaben publish my-item.json
 |---------|-------------|
 | `willhaben list` | List all your listings |
 | `willhaben get <id>` | Get details of a listing (yours or any public one) |
-| `willhaben publish <file>` | Create a new listing from JSON |
+| `willhaben publish <file>` | Create a new listing from JSON, with images (`--draft` to review first) |
 | `willhaben update <id>` | Update listing properties |
 | `willhaben delete <id>` | Delete a listing |
+| `willhaben activate <id>` | Put a draft live |
 | `willhaben republish <id>` | Republish an expired listing |
 | `willhaben deactivate <id>` | Take a listing offline |
 | `willhaben reserve <id>` | Mark as reserved |
@@ -316,6 +322,7 @@ willhaben upload-image 123456789 photo1.jpg photo2.jpg photo3.jpg
 | `street` | string | Street address |
 | `condition` | string | `"neu"`, `"gebraucht"`, or `"defekt"` |
 | `delivery` | string[] | `["PICKUP"]`, `["Versand"]`, or both |
+| `images` | string[] | Image files, relative to the template file. Uploaded before the listing goes live |
 | `attributes` | object | Category-specific attributes |
 | `contactInfo` | object | Contact information override |
 | `skipValidation` | boolean | Skip attribute validation |
