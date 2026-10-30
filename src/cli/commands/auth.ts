@@ -3,7 +3,8 @@ import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
 import { login, logout, whoami } from "../../api/auth.js";
-import { isAuthenticated } from "../../store/config.js";
+import { refreshAccessToken } from "../../api/client.js";
+import { getAuthTokens, isAuthenticated } from "../../store/config.js";
 
 export function registerAuthCommands(program: Command): void {
   program
@@ -76,6 +77,22 @@ export function registerAuthCommands(program: Command): void {
         console.log(`  ID: ${chalk.dim(result.data.id)}`);
         if (result.data.name) {
           console.log(`  Name: ${result.data.name}`);
+        }
+
+        // A refresh is confirmed by the server and also extends the session
+        const sessionSpinner = ora("Checking session...").start();
+        const accessToken = await refreshAccessToken();
+        sessionSpinner.stop();
+        if (accessToken) {
+          const tokens = await getAuthTokens();
+          const until = tokens?.refreshExpiresAt
+            ? ` (renews automatically, idle timeout ${new Date(tokens.refreshExpiresAt).toLocaleString()})`
+            : "";
+          console.log(`  Session: ${chalk.green("active")}${chalk.dim(until)}`);
+        } else {
+          console.log(`  Session: ${chalk.red("expired")}`);
+          console.log(chalk.dim("Run `willhaben login` to log in again."));
+          process.exitCode = 1;
         }
       } else {
         spinner.fail(chalk.red("Failed to fetch user info"));

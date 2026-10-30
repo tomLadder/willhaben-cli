@@ -1,6 +1,8 @@
 # whoami
 
-Show current user information.
+Show current user information and whether your session is still active.
+
+Checking the session refreshes it, which also extends it. If it has expired, the command says so and exits with code 1. Run `willhaben login` again in that case.
 
 ## Usage
 

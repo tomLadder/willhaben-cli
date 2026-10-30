@@ -1,27 +1,13 @@
 import { createHmac, randomBytes } from "crypto";
 import { loadConfig, saveConfig } from "../store/config.js";
+import { formatTimestamp, getClientHeaders, ORGANIZATION } from "./headers.js";
 import type { ApplicationToken } from "../types/index.js";
 
-// Secret key from decompiled Android app
+// Secret used to sign application token requests
 const HMAC_SECRET = "$2a$10$qTwigHZ2rRjCjRKwP.S6W.";
-const ORGANIZATION = "api@tailored-apps.com";
+// Listed in https://app-aggregator.willhaben.at/service-registry.json
 const APPLICATION_DATA_URL =
-  "https://api.willhaben.at/restapi/v2/application-data";
-
-// Generate timestamp in format: yyyy-MM-dd'T'HH:mm:ss+HHMM
-function formatTimestamp(date: Date = new Date()): string {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? "+" : "-";
-  const offsetHrs = pad(Math.floor(Math.abs(offset) / 60));
-  const offsetMins = pad(Math.abs(offset) % 60);
-
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}` +
-    `${sign}${offsetHrs}${offsetMins}`
-  );
-}
+  "https://app-aggregator.willhaben.at/api/v1/application-data";
 
 // Generate HMAC-SHA1 signature
 function generateSignature(salt: string, timestamp: string): string {
@@ -50,7 +36,7 @@ interface ApplicationDataResponse {
 
 // Fetch a new application token from the API
 async function fetchApplicationToken(): Promise<ApplicationToken> {
-  const salt = randomBytes(12).toString("base64");
+  const salt = randomBytes(12).toString("base64url");
   const timestamp = formatTimestamp();
   const signature = generateSignature(salt, timestamp);
 
@@ -64,18 +50,14 @@ async function fetchApplicationToken(): Promise<ApplicationToken> {
   };
 
   const response = await fetch(
-    `${APPLICATION_DATA_URL}?config_item=search-config`,
+    // root-links is the smallest config item; the token is returned regardless
+    `${APPLICATION_DATA_URL}?config_item=root-links`,
     {
       method: "POST",
       headers: {
+        ...getClientHeaders(),
         "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "willhaben/6201787 CFNetwork/3860.400.51 Darwin/25.3.0",
-        "x-wh-client":
-          "api@tailored-apps.com;willhabenapp;ios;8.33.0;responsive_app",
-        "x-wh-date": timestamp,
-        "x-wh-security-version": "20130527022532",
-        "x-wh-visitor-id": crypto.randomUUID().toUpperCase(),
+        "X-WH-Date": timestamp,
       },
       body: JSON.stringify(requestBody),
     }
@@ -136,6 +118,3 @@ export async function clearApplicationToken(): Promise<void> {
   delete config.applicationToken;
   await saveConfig(config);
 }
-
-// Export timestamp formatter for use in headers
-export { formatTimestamp };

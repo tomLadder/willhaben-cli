@@ -63,8 +63,10 @@ export interface ValidationResult {
 export async function getCategoryTree(
   adTypeId: number = 67
 ): Promise<ApiResponse<CategoryTreeResponse>> {
+  // Public data, so it also works when logged out or the session expired
   return apiClient.get<CategoryTreeResponse>(
-    ENDPOINTS.categoryTreeWithAttributes(adTypeId)
+    ENDPOINTS.categoryTreeWithAttributes(adTypeId),
+    { authenticated: false }
   );
 }
 

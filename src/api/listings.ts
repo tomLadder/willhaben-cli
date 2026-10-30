@@ -1,4 +1,10 @@
-import { apiClient, REST_API_URL } from "./client.js";
+import {
+  apiClient,
+  getValidAccessToken,
+  REST_API_URL,
+  SESSION_EXPIRED_ERROR,
+} from "./client.js";
+import { getClientHeaders } from "./headers.js";
 import {
   updateCachedListings,
   updateCachedListing,
@@ -17,7 +23,7 @@ import type {
   ApiResponse,
 } from "../types/index.js";
 
-// Real endpoints discovered via mitmproxy
+// API endpoints
 const ENDPOINTS = {
   // Read endpoints (Public API)
   listMyAds: "/myatz/v1/atverz/showpagedadsfromuser",
@@ -138,17 +144,23 @@ interface WillhabenListingsResponse {
   totalNumberOfAdvertDetails: number;
 }
 
+// Map the numeric ad status, which both /myatz/v1/ and /atdetail/v1/ return
+function statusFromId(statusId: number): Listing["status"] {
+  if (statusId === 50 || statusId === 51) return "active";
+  if (statusId === 120) return "sold";
+  if (statusId >= 60 && statusId <= 63) return "expired";
+  if ((statusId >= 80 && statusId <= 87) || (statusId >= 110 && statusId <= 117)) {
+    return "rejected";
+  }
+  if (statusId === 30 || statusId === 31 || statusId === 90) return "pending";
+  if (statusId === 10) return "draft";
+  return "inactive";
+}
+
 // Convert API response to our Listing type (for /myatz/v1/ endpoints)
 function convertToListing(ad: WillhabenAdvert, verticalName: string): Listing {
   const priceAttr = ad.attributes?.attribute.find((a) => a.name === "PRICE");
   const price = priceAttr ? parseFloat(priceAttr.values[0]) : 0;
-
-  const statusMap: Record<string, Listing["status"]> = {
-    active: "active",
-    passive: "expired",
-    sold: "inactive",
-    inactive: "inactive",
-  };
 
   return {
     id: ad.id,
@@ -158,7 +170,7 @@ function convertToListing(ad: WillhabenAdvert, verticalName: string): Listing {
     currency: "EUR",
     category: verticalName,
     categoryId: ad.adTypeId,
-    status: statusMap[ad.advertStatus.id] || "active",
+    status: statusFromId(ad.advertStatus.statusId),
     images:
       ad.advertImageList?.advertImage
         .filter((img) => img.mainImageUrl)
@@ -213,13 +225,6 @@ function convertAdDetailToListing(detail: AdDetailResponse): Listing {
     values: [kv.value],
   })) || [];
 
-  // Map status
-  const statusMap: Record<number, Listing["status"]> = {
-    50: "active",
-    60: "inactive",
-    70: "expired",
-  };
-
   return {
     id: detail.adId,
     title: detail.description,
@@ -228,7 +233,7 @@ function convertAdDetailToListing(detail: AdDetailResponse): Listing {
     currency: "EUR",
     category,
     categoryId: detail.adTypeId,
-    status: statusMap[detail.status.id] || "active",
+    status: statusFromId(detail.status.id),
     images,
     attributes,
     createdAt: new Date().toISOString(),
@@ -394,6 +399,10 @@ export interface PublishListingOptions {
   attributes?: Record<string, string | string[]>;
   // Skip attribute validation (not recommended)
   skipValidation?: boolean;
+  // Image file paths, uploaded before the listing goes live
+  images?: string[];
+  // Keep the listing as a draft instead of putting it live
+  draft?: boolean;
 }
 
 // Cached category tree for validation
@@ -572,34 +581,54 @@ export async function createListing(
     };
   }
 
-  const adId = saveResponse.data.adId;
+  const adId = saveResponse.data.adId.toString();
 
-  // Step 2: Activate/publish the draft (uses PUT)
-  const activateResponse = await apiClient.put<CreateAdResponse>(
-    ENDPOINTS.publish(adId.toString())
-  );
+  // Step 2: Upload images while it's still a draft, so it never goes live without them
+  let images: Listing["images"] = [];
+  if (options.images && options.images.length > 0) {
+    const uploadResponse = await uploadImages(adId, options.images);
+    if (!uploadResponse.success) {
+      return {
+        success: false,
+        error: {
+          code: "IMAGE_UPLOAD_FAILED",
+          message: `Draft saved (ID: ${adId}) but image upload failed: ${uploadResponse.error?.message ?? "unknown error"}`,
+          details: { adId },
+        },
+      };
+    }
+    images = (uploadResponse.data?.advertImage ?? []).map((img) => ({
+      url: img.mainImageUrl,
+      id: String(img.id),
+    }));
+  }
 
-  if (!activateResponse.success) {
-    return {
-      success: false,
-      error: activateResponse.error || {
-        code: "ACTIVATE_FAILED",
-        message: `Draft created (ID: ${adId}) but failed to publish`,
-      },
-    };
+  // Step 3: Activate/publish the draft (uses PUT)
+  if (!options.draft) {
+    const activateResponse = await activateListing(adId);
+    if (!activateResponse.success) {
+      return {
+        success: false,
+        error: {
+          code: "ACTIVATE_FAILED",
+          message: `Draft saved (ID: ${adId}) but failed to publish: ${activateResponse.error?.message ?? "unknown error"}`,
+          details: { adId },
+        },
+      };
+    }
   }
 
   // Return the created listing
   const listing: Listing = {
-    id: adId.toString(),
+    id: adId,
     title: options.title,
     description: options.description,
     price: options.price,
     currency: "EUR",
     category: options.categoryPath[options.categoryPath.length - 1] || "Unknown",
     categoryId: 67,
-    status: "active",
-    images: [],
+    status: options.draft ? "draft" : "active",
+    images,
     attributes: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -607,6 +636,13 @@ export async function createListing(
 
   await updateCachedListing(listing);
   return { success: true, data: listing };
+}
+
+/**
+ * Put a saved draft live.
+ */
+export async function activateListing(id: string): Promise<ApiResponse<void>> {
+  return apiClient.put<void>(ENDPOINTS.publish(id));
 }
 
 // Response type from GET /bap/{id} for editing
@@ -747,8 +783,8 @@ export async function uploadImage(
 ): Promise<ApiResponse<ImageListResponse>> {
   const { readFile } = await import("fs/promises");
   const { basename } = await import("path");
-  const { getApplicationToken, formatTimestamp } = await import("./application-token.js");
-  const { getAuthTokens, isTokenExpired, setAuthTokens } = await import("../store/config.js");
+  const { getApplicationToken } = await import("./application-token.js");
+  const { getAuthTokens } = await import("../store/config.js");
 
   try {
     const imageBuffer = await readFile(imagePath);
@@ -770,50 +806,25 @@ export async function uploadImage(
     const blob = new Blob([imageBuffer], { type: contentType });
     formData.append("file", blob, fileName);
 
-    // Get tokens and refresh if needed
     const applicationToken = await getApplicationToken();
-    let tokens = await getAuthTokens();
-
-    if (!tokens) {
+    if (!(await getAuthTokens())) {
       return {
         success: false,
         error: { code: "AUTH_ERROR", message: "Not logged in" },
       };
     }
-
-    // Refresh token if expired
-    if (await isTokenExpired()) {
-      const refreshResponse = await fetch(
-        "https://sso.willhaben.at/auth/realms/willhaben/protocol/openid-connect/token",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: "apps",
-            grant_type: "refresh_token",
-            refresh_token: tokens.refreshToken,
-          }),
-        }
-      );
-      if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json();
-        tokens = {
-          ...tokens,
-          accessToken: refreshData.access_token,
-          expiresAt: Date.now() + refreshData.expires_in * 1000,
-        };
-        await setAuthTokens(tokens);
-      }
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) {
+      return { success: false, error: SESSION_EXPIRED_ERROR };
     }
 
+    // Sent without apiClient so fetch can set the multipart Content-Type boundary
     const response = await fetch(ENDPOINTS.uploadImage(adId), {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${tokens.accessToken}`,
-        "x-wh-application-token": applicationToken,
-        "x-wh-client": "api@tailored-apps.com;willhabenapp;ios;8.33.0;responsive_app",
-        "x-wh-date": formatTimestamp(),
-        "Accept": "application/json",
+        ...getClientHeaders(),
+        Authorization: `Bearer ${accessToken}`,
+        "X-WH-Application-Token": applicationToken,
       },
       body: formData,
     });

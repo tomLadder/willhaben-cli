@@ -1,23 +1,70 @@
 import { getAuthTokens, setAuthTokens, isTokenExpired } from "../store/config.js";
-import { getApplicationToken, formatTimestamp } from "./application-token.js";
-import type { ApiResponse, RefreshTokenResponse } from "../types/index.js";
+import { getApplicationToken } from "./application-token.js";
+import { getClientHeaders } from "./headers.js";
+import type { ApiError, ApiResponse } from "../types/index.js";
 
-// Real API base URLs discovered via mitmproxy
+// API base URLs
 const SSO_URL = "https://sso.willhaben.at";
 const PUBLIC_API_URL = "https://publicapi.willhaben.at";
 const REST_API_URL = "https://api.willhaben.at/restapi/v2";
+const SEARCH_API_URL = "https://ad-search.willhaben.at/restapi/v2";
 
-// Common headers for mobile app API
-const getDefaultHeaders = (): Record<string, string> => ({
-  "Content-Type": "application/json",
-  Accept: "application/json",
-  "User-Agent": "willhaben/6201787 CFNetwork/3860.400.51 Darwin/25.3.0",
-  "x-wh-client": "api@tailored-apps.com;willhabenapp;ios;8.33.0;responsive_app",
-  "x-wh-date": formatTimestamp(),
-  "x-wh-security-version": "20130527022532",
-  "x-wh-visitor-id": crypto.randomUUID().toUpperCase(),
-  applicationprovider: "api@tailored-apps.com",
-});
+const TOKEN_URL = `${SSO_URL}/auth/realms/willhaben/protocol/openid-connect/token`;
+
+export const SESSION_EXPIRED_ERROR: ApiError = {
+  code: "SESSION_EXPIRED",
+  message: "Your session has expired. Run `willhaben login` to log in again.",
+};
+
+/**
+ * Refresh the access token. Keycloak rotates refresh tokens, so the new
+ * refresh token must be stored too, otherwise the session dies once the
+ * original refresh token expires.
+ * Returns the new access token, or null if the session can't be refreshed.
+ */
+export async function refreshAccessToken(): Promise<string | null> {
+  const tokens = await getAuthTokens();
+  if (!tokens) return null;
+
+  try {
+    const response = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: "apps",
+        grant_type: "refresh_token",
+        refresh_token: tokens.refreshToken,
+        scope: "openid",
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    await setAuthTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token ?? tokens.refreshToken,
+      expiresAt: Date.now() + data.expires_in * 1000,
+      refreshExpiresAt: data.refresh_expires_in
+        ? Date.now() + data.refresh_expires_in * 1000
+        : tokens.refreshExpiresAt,
+    });
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get a valid access token, refreshing it if needed.
+ * Returns null if not logged in or the session has expired.
+ */
+export async function getValidAccessToken(): Promise<string | null> {
+  const tokens = await getAuthTokens();
+  if (!tokens) return null;
+  if (await isTokenExpired()) return refreshAccessToken();
+  return tokens.accessToken;
+}
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -32,64 +79,6 @@ export class ApiClient {
 
   constructor(baseUrl: string = PUBLIC_API_URL) {
     this.baseUrl = baseUrl;
-  }
-
-  private async getAuthHeader(): Promise<Record<string, string>> {
-    const tokens = await getAuthTokens();
-    if (!tokens) return {};
-
-    // Check if token needs refresh
-    if (await isTokenExpired()) {
-      const refreshed = await this.refreshToken(tokens.refreshToken);
-      if (refreshed) {
-        return { Authorization: `Bearer ${refreshed.accessToken}` };
-      }
-      return {};
-    }
-
-    return { Authorization: `Bearer ${tokens.accessToken}` };
-  }
-
-  private async refreshToken(
-    refreshToken: string
-  ): Promise<RefreshTokenResponse | null> {
-    try {
-      const response = await fetch(
-        `${SSO_URL}/auth/realms/willhaben/protocol/openid-connect/token`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            client_id: "apps",
-            grant_type: "refresh_token",
-            refresh_token: refreshToken,
-          }),
-        }
-      );
-
-      if (!response.ok) return null;
-
-      const data = await response.json();
-
-      // Update stored tokens
-      const tokens = await getAuthTokens();
-      if (tokens) {
-        await setAuthTokens({
-          ...tokens,
-          accessToken: data.access_token,
-          expiresAt: Date.now() + data.expires_in * 1000,
-        });
-      }
-
-      return {
-        accessToken: data.access_token,
-        expiresIn: data.expires_in,
-      };
-    } catch {
-      return null;
-    }
   }
 
   async request<T>(
@@ -108,12 +97,19 @@ export class ApiClient {
       // Get application token (required for all API requests)
       const applicationToken = await getApplicationToken();
 
-      const authHeaders = authenticated ? await this.getAuthHeader() : {};
-      const defaultHeaders = getDefaultHeaders();
-
-      if (contentType) {
-        defaultHeaders["Content-Type"] = contentType;
+      // Without a stored session the request goes out anonymously, as before
+      const authHeaders: Record<string, string> = {};
+      if (authenticated && (await getAuthTokens())) {
+        const accessToken = await getValidAccessToken();
+        if (!accessToken) {
+          return { success: false, error: SESSION_EXPIRED_ERROR };
+        }
+        authHeaders.Authorization = `Bearer ${accessToken}`;
       }
+      const defaultHeaders: Record<string, string> = {
+        ...getClientHeaders(),
+        "Content-Type": contentType ?? "application/json",
+      };
 
       const url = endpoint.startsWith("http")
         ? endpoint
@@ -123,7 +119,7 @@ export class ApiClient {
         method,
         headers: {
           ...defaultHeaders,
-          "x-wh-application-token": applicationToken,
+          "X-WH-Application-Token": applicationToken,
           ...authHeaders,
           ...headers,
         },
@@ -207,4 +203,4 @@ export class ApiClient {
 }
 
 export const apiClient = new ApiClient(PUBLIC_API_URL);
-export { SSO_URL, PUBLIC_API_URL, REST_API_URL };
+export { SSO_URL, PUBLIC_API_URL, REST_API_URL, SEARCH_API_URL };

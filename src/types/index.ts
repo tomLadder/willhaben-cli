@@ -3,6 +3,7 @@ export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
   expiresAt: number; // Unix timestamp
+  refreshExpiresAt?: number; // Unix timestamp; absent for sessions from older versions
 }
 
 // Application token for API access (valid 30 days)
@@ -47,7 +48,15 @@ export interface Listing {
   currency: string;
   category: string;
   categoryId: number;
-  status: "active" | "inactive" | "expired" | "deleted";
+  status:
+    | "draft"
+    | "pending"
+    | "active"
+    | "expired"
+    | "rejected"
+    | "sold"
+    | "inactive"
+    | "deleted";
   images: ListingImage[];
   attributes: ListingAttribute[];
   location?: {
@@ -73,15 +82,17 @@ export interface ListingTemplate {
   categoryPath: string[];
   // Location settings
   postCode: string;
-  locationId: number; // District ID, e.g., 117458 for Jakomini/Graz
-  location: string; // District name, e.g., "Jakomini"
+  // District name, e.g., "Jakomini". Optional if the postcode has a single location.
+  location?: string;
+  // District ID, e.g., 117458 for Jakomini/Graz. Resolved from postCode + location if omitted.
+  locationId?: number;
   street?: string; // Street address (any text)
   // Optional attributes
   condition?: "neu" | "gebraucht" | "defekt";
   delivery?: ("PICKUP" | "Versand")[];
+  images?: string[]; // Image file paths, relative to the template file
   // Legacy fields (kept for compatibility)
   categoryId?: number;
-  images?: string[]; // File paths or URLs
   attributes?: Record<string, string | string[]>;
   contactInfo?: {
     name?: string;

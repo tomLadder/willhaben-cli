@@ -18,7 +18,16 @@ willhaben publish <file> [options]
 
 | Option | Description |
 |--------|-------------|
+| `--draft` | Save as a draft without putting it live. Publish it later with `willhaben activate <id>` |
 | `--json` | Output as JSON |
+
+## How publishing works
+
+1. The listing is saved as a draft.
+2. The images from `images` are uploaded.
+3. The draft is put live, unless `--draft` is set.
+
+If an image upload fails, the listing stays a draft and never goes live without its photos. The error message contains the draft ID.
 
 ## Template Format
 
@@ -30,16 +39,17 @@ willhaben publish <file> [options]
 | `description` | string | Detailed description |
 | `price` | number | Price in EUR |
 | `postCode` | string | Postal code (e.g., "1010") |
-| `locationId` | number | Willhaben location ID |
-| `location` | string | District/city name |
 | `categoryPath` | string[] | Category path from root to leaf |
 
 ### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `location` | string | Location name from [`locations`](/commands/locations). Needed if the postcode has several locations |
+| `locationId` | number | Location id. Looked up from `postCode` and `location` if omitted |
 | `condition` | string | `"neu"`, `"gebraucht"`, or `"defekt"` |
 | `delivery` | string[] | `["PICKUP"]`, `["Versand"]`, or both |
+| `images` | string[] | Image files (jpg, png, gif, webp), relative to the template file. The first one is the cover image |
 | `attributes` | object | Category-specific attributes |
 
 ## Example Template
@@ -52,11 +62,10 @@ Create `my-item.json`:
   "description": "Selling my iPhone 14 Pro 256GB in excellent condition. Always used with a case and screen protector.",
   "price": 799,
   "postCode": "1010",
-  "locationId": 900,
-  "location": "Wien",
   "categoryPath": ["MOBILE_ELECTRONICS", "MOBILE_PHONES", "IPHONE"],
   "condition": "gebraucht",
-  "delivery": ["PICKUP", "Versand"]
+  "delivery": ["PICKUP", "Versand"],
+  "images": ["front.jpg", "back.jpg"]
 }
 ```
 
@@ -64,9 +73,18 @@ Then publish:
 
 ```bash
 willhaben publish my-item.json
-# Listing created successfully!
-# ID: 123456789
-# URL: https://willhaben.at/iad/object?adId=123456789
+# ✔ Listing published successfully!
+#   ID: 123456789
+#   Title: iPhone 14 Pro - Excellent Condition
+#   Price: € 799
+#   Images: 2
+```
+
+Or save it as a draft first, check it in the willhaben app, and put it live afterwards:
+
+```bash
+willhaben publish my-item.json --draft
+willhaben activate 123456789
 ```
 
 ## Category Examples
@@ -80,7 +98,6 @@ willhaben publish my-item.json
   "description": "Verkaufe meinen HP LaserJet Pro Drucker...",
   "price": 120,
   "postCode": "8010",
-  "locationId": 117458,
   "location": "Graz",
   "categoryPath": [
     "COMPUTER_SOFTWARE",
@@ -106,8 +123,6 @@ willhaben publish my-item.json
   "description": "Buch in sehr gutem Zustand...",
   "price": 15,
   "postCode": "5020",
-  "locationId": 30501,
-  "location": "Salzburg",
   "categoryPath": [
     "BOOKSFILMANDMUSIC",
     "NON_FICTION_BOOKS"

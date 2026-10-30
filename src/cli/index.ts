@@ -4,6 +4,8 @@ import { registerListingCommands } from "./commands/listings.js";
 import { registerConfigCommands } from "./commands/config.js";
 import { registerSetupCommands } from "./commands/setup.js";
 import { registerCategoryCommands } from "./commands/categories.js";
+import { registerSearchCommands } from "./commands/search.js";
+import { registerLocationCommands } from "./commands/locations.js";
 
 export function createCLI(): Command {
   const program = new Command();
@@ -17,6 +19,8 @@ export function createCLI(): Command {
   registerAuthCommands(program);
   registerListingCommands(program);
   registerCategoryCommands(program);
+  registerSearchCommands(program);
+  registerLocationCommands(program);
   registerConfigCommands(program);
   registerSetupCommands(program);
 

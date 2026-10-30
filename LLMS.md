@@ -72,7 +72,6 @@ Create a JSON file with the listing details:
   "price": 25,
   "categoryPath": ["BOOKSFILMANDMUSIC", "NON_FICTION_BOOKS"],
   "postCode": "8010",
-  "locationId": 117458,
   "location": "Jakomini",
   "condition": "gebraucht",
   "delivery": ["PICKUP", "Versand"]
@@ -88,55 +87,50 @@ Create a JSON file with the listing details:
 | `price` | number | Price in EUR (use 0 for "Zu verschenken") |
 | `categoryPath` | string[] | Category path codes from `categories list` |
 | `postCode` | string | Austrian postal code (e.g., "8010") |
-| `locationId` | number | District ID (see Location IDs below) |
-| `location` | string | District name |
 
 #### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `location` | string | Location name, required if the postcode has several locations (see below) |
+| `locationId` | number | Location id, looked up automatically from `postCode` + `location` |
 | `condition` | string | `"neu"`, `"gebraucht"`, or `"defekt"` |
 | `delivery` | string[] | `["PICKUP"]`, `["Versand"]`, or both |
+| `images` | string[] | Image files (jpg, png, gif, webp), relative to the template file. First is the cover |
 | `street` | string | Street address |
 | `attributes` | object | Category-specific attributes |
 | `contactInfo.name` | string | Contact name override |
 | `skipValidation` | boolean | Skip client-side validation |
 
-#### Common Location IDs (Graz)
+#### Locations
 
-| District | locationId | postCode |
-|----------|------------|----------|
-| Innere Stadt | 117451 | 8010 |
-| St. Leonhard | 117452 | 8010 |
-| Geidorf | 117453 | 8010 |
-| Lend | 117454 | 8020 |
-| Gries | 117455 | 8020 |
-| Jakomini | 117458 | 8010 |
-| Liebenau | 117459 | 8041 |
-| St. Peter | 117460 | 8042 |
-| Waltendorf | 117461 | 8010 |
-| Ries | 117462 | 8010 |
-| Mariatrost | 117463 | 8043 |
-| Andritz | 117464 | 8045 |
-| Gösting | 117465 | 8051 |
-| Eggenberg | 117466 | 8020 |
-| Wetzelsdorf | 117467 | 8052 |
-| Straßgang | 117468 | 8053 |
-| Puntigam | 117469 | 8055 |
+`publish` resolves the location from `postCode`. If a postcode has several locations (e.g. the districts of Graz under 8010), set `location` to one of the names listed by:
 
-For other cities, use the postCode and a general locationId for the area.
+```bash
+willhaben locations 8010
+willhaben locations 8010 --json
+```
 
 ### Step 3: Publish the Listing
+
+`publish` saves a draft, uploads the template's `images`, then puts the listing live. If an image upload fails, the listing stays a draft and the error contains its ID.
 
 ```bash
 # Publish from template file
 willhaben publish listing.json
 
+# Save as draft only, so the user can review it in the willhaben app first
+willhaben publish listing.json --draft
+# ...then put it live
+willhaben activate <listing-id>
+
 # Output as JSON (for programmatic use)
 willhaben publish listing.json --json
 ```
 
-### Step 4: Upload Images
+Prefer `--draft` when the user hasn't explicitly asked to publish right away.
+
+### Step 4: Manage Images Later
 
 ```bash
 # Upload single image
@@ -175,6 +169,9 @@ willhaben update <listing-id> --description "Updated description"
 willhaben delete <listing-id>
 willhaben delete <listing-id> --force  # Skip confirmation
 
+# Put a draft live
+willhaben activate <listing-id>
+
 # Deactivate (take offline temporarily)
 willhaben deactivate <listing-id>
 
@@ -188,6 +185,25 @@ willhaben unreserve <listing-id>
 # Mark as sold
 willhaben sold <listing-id>
 ```
+
+## Searching Listings
+
+Search works without login. Use it to check comparable prices before setting a price.
+
+```bash
+willhaben search nintendo switch --json
+willhaben search fahrrad --min 100 --max 300 --state steiermark --private --sort price-asc --json
+
+# List available filters (categories, condition, delivery, ...) with their url params
+willhaben search fahrrad --facets --json
+# Apply one with --filter <param>=<value> (repeatable), e.g. condition "Neu":
+willhaben search fahrrad --filter treeAttributes=22 --json
+```
+
+`--category` takes the search category id from the `category` facet (`ATTRIBUTE_TREE`). These ids are not the `categoryPath` codes used for publishing.
+
+States: burgenland, kaernten, niederoesterreich, oberoesterreich, salzburg, steiermark, tirol, vorarlberg, wien.
+Sort: newest, nearest, price-asc, price-desc, relevance.
 
 ## Example: Complete Listing Creation Flow
 
@@ -210,18 +226,18 @@ cat > listing.json << 'EOF'
   "price": 15,
   "categoryPath": ["BOOKSFILMANDMUSIC", "NON_FICTION_BOOKS"],
   "postCode": "8010",
-  "locationId": 117458,
   "location": "Jakomini",
   "condition": "gebraucht",
-  "delivery": ["PICKUP", "Versand"]
+  "delivery": ["PICKUP", "Versand"],
+  "images": ["buch_cover.jpg", "buch_rueckseite.jpg"]
 }
 EOF
 
-# 5. Publish
-willhaben publish listing.json
+# 5. Save as draft with images, let the user review it in the app
+willhaben publish listing.json --draft
 
-# 6. Upload images (use listing ID from publish output)
-willhaben upload-image <listing-id> buch_cover.jpg buch_rueckseite.jpg
+# 6. Put it live (use listing ID from publish output)
+willhaben activate <listing-id>
 ```
 
 ## JSON Output Mode
