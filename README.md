@@ -46,6 +46,11 @@
 - Republish expired listings
 - Bulk operations support
 
+**Search**
+- Search marketplace listings without logging in
+- Filter by price, state, seller type, condition, delivery, and category
+- Postcode to location lookup for listing templates
+
 **Image Support**
 - Upload single or multiple images
 - View listing images
@@ -135,8 +140,6 @@ Create a template file `my-item.json`:
   "description": "Selling my iPhone 14 Pro 256GB in excellent condition...",
   "price": 799,
   "postCode": "1010",
-  "locationId": 900,
-  "location": "Wien",
   "categoryPath": ["MOBILE_ELECTRONICS", "MOBILE_PHONES", "IPHONE"],
   "condition": "gebraucht",
   "delivery": ["PICKUP", "Versand"]
@@ -166,7 +169,7 @@ willhaben publish my-item.json
 | Command | Description |
 |---------|-------------|
 | `willhaben list` | List all your listings |
-| `willhaben get <id>` | Get details of a listing |
+| `willhaben get <id>` | Get details of a listing (yours or any public one) |
 | `willhaben publish <file>` | Create a new listing from JSON |
 | `willhaben update <id>` | Update listing properties |
 | `willhaben delete <id>` | Delete a listing |
@@ -175,6 +178,13 @@ willhaben publish my-item.json
 | `willhaben reserve <id>` | Mark as reserved |
 | `willhaben unreserve <id>` | Remove reservation |
 | `willhaben sold <id>` | Mark as sold |
+
+### Search
+
+| Command | Description |
+|---------|-------------|
+| `willhaben search [keyword...]` | Search marketplace listings (no login required) |
+| `willhaben locations <postcode>` | Look up location ids for a postcode |
 
 ### Images
 
@@ -224,6 +234,32 @@ willhaben get 123456789 --cached
 willhaben get 123456789 --json
 ```
 
+### Search Listings
+
+```bash
+# Keyword search
+willhaben search nintendo switch
+
+# Filters: price range, state, private sellers only, newest first
+willhaben search fahrrad --min 100 --max 300 --state steiermark --private --sort newest
+
+# Show the available filters (categories, condition, delivery, ...) with hit counts
+willhaben search fahrrad --facets
+
+# Apply a filter from --facets, e.g. condition "Neu"
+willhaben search fahrrad --filter treeAttributes=22
+
+# Output as JSON
+willhaben search iphone --rows 50 --json
+```
+
+### Look Up Locations
+
+```bash
+# Find the location for a postcode (used by listing templates)
+willhaben locations 8010
+```
+
 ### Update Listing
 
 ```bash
@@ -269,14 +305,14 @@ willhaben upload-image 123456789 photo1.jpg photo2.jpg photo3.jpg
 | `description` | string | Detailed description |
 | `price` | number | Price in EUR |
 | `postCode` | string | Postal code (e.g., "8010") |
-| `locationId` | number | Willhaben location ID |
-| `location` | string | District/city name |
 | `categoryPath` | string[] | Category path from root to leaf |
 
 ### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `location` | string | Location name from `willhaben locations <postcode>`. Needed if the postcode has several locations |
+| `locationId` | number | Location id. Looked up from `postCode` and `location` if omitted |
 | `street` | string | Street address |
 | `condition` | string | `"neu"`, `"gebraucht"`, or `"defekt"` |
 | `delivery` | string[] | `["PICKUP"]`, `["Versand"]`, or both |
@@ -295,7 +331,6 @@ willhaben upload-image 123456789 photo1.jpg photo2.jpg photo3.jpg
   "description": "Verkaufe meinen HP LaserJet Pro Drucker...",
   "price": 120,
   "postCode": "8010",
-  "locationId": 117458,
   "location": "Jakomini",
   "categoryPath": [
     "COMPUTER_SOFTWARE",
@@ -321,8 +356,6 @@ willhaben upload-image 123456789 photo1.jpg photo2.jpg photo3.jpg
   "description": "DJI Mini 3 Pro mit allem Zubehör...",
   "price": 750,
   "postCode": "1010",
-  "locationId": 900,
-  "location": "Wien",
   "categoryPath": [
     "LEISURE_INSTRUMENTS_CULINARY",
     "MODEL_MAKING",
@@ -348,8 +381,6 @@ willhaben upload-image 123456789 photo1.jpg photo2.jpg photo3.jpg
   "description": "Buch in sehr gutem Zustand...",
   "price": 15,
   "postCode": "5020",
-  "locationId": 30501,
-  "location": "Salzburg",
   "categoryPath": [
     "BOOKSFILMANDMUSIC",
     "NON_FICTION_BOOKS"
@@ -497,11 +528,11 @@ The API was reverse-engineered from the willhaben mobile app using [mitmproxy](h
 <details>
 <summary><strong>How do I find my locationId?</strong></summary>
 
-Location IDs can be found in the category tree response or by inspecting the willhaben app traffic. Common IDs:
-- Vienna (Wien): 900
-- Graz: 117458
-- Salzburg: 30501
-- Linz: 40101
+You usually don't need it. `publish` looks it up from `postCode`, using `location` to pick one when a postcode has several locations (e.g. the districts of Graz under 8010). To see the options:
+
+```bash
+willhaben locations 8010
+```
 </details>
 
 <details>

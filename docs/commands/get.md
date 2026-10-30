@@ -1,6 +1,6 @@
 # get
 
-Get detailed information about a specific listing.
+Get detailed information about a listing: one of yours, or any public listing (e.g. from [`search`](/commands/search)).
 
 ## Usage
 
@@ -77,6 +77,6 @@ willhaben get 123456789 --json
 }
 ```
 
-## Requires Authentication
+## Authentication
 
-You must be logged in to use this command.
+Works without login for public listings. When logged in, your session is used.

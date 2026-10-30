@@ -1,4 +1,10 @@
-import { apiClient, REST_API_URL } from "./client.js";
+import {
+  apiClient,
+  getValidAccessToken,
+  REST_API_URL,
+  SESSION_EXPIRED_ERROR,
+} from "./client.js";
+import { getClientHeaders } from "./headers.js";
 import {
   updateCachedListings,
   updateCachedListing,
@@ -17,7 +23,7 @@ import type {
   ApiResponse,
 } from "../types/index.js";
 
-// Real endpoints discovered via mitmproxy
+// API endpoints
 const ENDPOINTS = {
   // Read endpoints (Public API)
   listMyAds: "/myatz/v1/atverz/showpagedadsfromuser",
@@ -747,8 +753,8 @@ export async function uploadImage(
 ): Promise<ApiResponse<ImageListResponse>> {
   const { readFile } = await import("fs/promises");
   const { basename } = await import("path");
-  const { getApplicationToken, formatTimestamp } = await import("./application-token.js");
-  const { getAuthTokens, isTokenExpired, setAuthTokens } = await import("../store/config.js");
+  const { getApplicationToken } = await import("./application-token.js");
+  const { getAuthTokens } = await import("../store/config.js");
 
   try {
     const imageBuffer = await readFile(imagePath);
@@ -770,50 +776,25 @@ export async function uploadImage(
     const blob = new Blob([imageBuffer], { type: contentType });
     formData.append("file", blob, fileName);
 
-    // Get tokens and refresh if needed
     const applicationToken = await getApplicationToken();
-    let tokens = await getAuthTokens();
-
-    if (!tokens) {
+    if (!(await getAuthTokens())) {
       return {
         success: false,
         error: { code: "AUTH_ERROR", message: "Not logged in" },
       };
     }
-
-    // Refresh token if expired
-    if (await isTokenExpired()) {
-      const refreshResponse = await fetch(
-        "https://sso.willhaben.at/auth/realms/willhaben/protocol/openid-connect/token",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: "apps",
-            grant_type: "refresh_token",
-            refresh_token: tokens.refreshToken,
-          }),
-        }
-      );
-      if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json();
-        tokens = {
-          ...tokens,
-          accessToken: refreshData.access_token,
-          expiresAt: Date.now() + refreshData.expires_in * 1000,
-        };
-        await setAuthTokens(tokens);
-      }
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) {
+      return { success: false, error: SESSION_EXPIRED_ERROR };
     }
 
+    // Sent without apiClient so fetch can set the multipart Content-Type boundary
     const response = await fetch(ENDPOINTS.uploadImage(adId), {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${tokens.accessToken}`,
-        "x-wh-application-token": applicationToken,
-        "x-wh-client": "api@tailored-apps.com;willhabenapp;ios;8.33.0;responsive_app",
-        "x-wh-date": formatTimestamp(),
-        "Accept": "application/json",
+        ...getClientHeaders(),
+        Authorization: `Bearer ${accessToken}`,
+        "X-WH-Application-Token": applicationToken,
       },
       body: formData,
     });

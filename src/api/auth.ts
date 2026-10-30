@@ -361,6 +361,10 @@ export async function login(): Promise<ApiResponse<{ user: UserInfo }>> {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresAt: Date.now() + tokens.expires_in * 1000,
+      // 0 means the refresh token doesn't expire on its own
+      refreshExpiresAt: tokens.refresh_expires_in
+        ? Date.now() + tokens.refresh_expires_in * 1000
+        : undefined,
     });
     await setUserInfo(user);
 

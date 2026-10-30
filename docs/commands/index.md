@@ -15,10 +15,17 @@ Quick reference for all willhaben-cli commands.
 | Command | Description |
 |---------|-------------|
 | [`list`](/commands/list) | List all your listings |
-| [`get`](/commands/get) | Get listing details |
+| [`get`](/commands/get) | Get listing details (yours or any public one) |
 | [`publish`](/commands/publish) | Create a new listing |
 | [`update`](/commands/update) | Update listing properties |
 | [`delete`](/commands/delete) | Delete a listing |
+
+## Search
+
+| Command | Description |
+|---------|-------------|
+| [`search`](/commands/search) | Search marketplace listings (no login required) |
+| [`locations`](/commands/locations) | Look up location ids for a postcode |
 
 ## Listing Actions
 

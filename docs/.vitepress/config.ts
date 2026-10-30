@@ -43,6 +43,8 @@ export default defineConfig({
             { text: 'update', link: '/commands/update' },
             { text: 'delete', link: '/commands/delete' },
             { text: 'images', link: '/commands/images' },
+            { text: 'search', link: '/commands/search' },
+            { text: 'locations', link: '/commands/locations' },
             { text: 'config', link: '/commands/config' },
           ]
         }

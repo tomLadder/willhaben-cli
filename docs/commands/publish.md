@@ -30,14 +30,14 @@ willhaben publish <file> [options]
 | `description` | string | Detailed description |
 | `price` | number | Price in EUR |
 | `postCode` | string | Postal code (e.g., "1010") |
-| `locationId` | number | Willhaben location ID |
-| `location` | string | District/city name |
 | `categoryPath` | string[] | Category path from root to leaf |
 
 ### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `location` | string | Location name from [`locations`](/commands/locations). Needed if the postcode has several locations |
+| `locationId` | number | Location id. Looked up from `postCode` and `location` if omitted |
 | `condition` | string | `"neu"`, `"gebraucht"`, or `"defekt"` |
 | `delivery` | string[] | `["PICKUP"]`, `["Versand"]`, or both |
 | `attributes` | object | Category-specific attributes |
@@ -52,8 +52,6 @@ Create `my-item.json`:
   "description": "Selling my iPhone 14 Pro 256GB in excellent condition. Always used with a case and screen protector.",
   "price": 799,
   "postCode": "1010",
-  "locationId": 900,
-  "location": "Wien",
   "categoryPath": ["MOBILE_ELECTRONICS", "MOBILE_PHONES", "IPHONE"],
   "condition": "gebraucht",
   "delivery": ["PICKUP", "Versand"]
@@ -80,7 +78,6 @@ willhaben publish my-item.json
   "description": "Verkaufe meinen HP LaserJet Pro Drucker...",
   "price": 120,
   "postCode": "8010",
-  "locationId": 117458,
   "location": "Graz",
   "categoryPath": [
     "COMPUTER_SOFTWARE",
@@ -106,8 +103,6 @@ willhaben publish my-item.json
   "description": "Buch in sehr gutem Zustand...",
   "price": 15,
   "postCode": "5020",
-  "locationId": 30501,
-  "location": "Salzburg",
   "categoryPath": [
     "BOOKSFILMANDMUSIC",
     "NON_FICTION_BOOKS"
