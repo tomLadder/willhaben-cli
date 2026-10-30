@@ -48,7 +48,15 @@ export interface Listing {
   currency: string;
   category: string;
   categoryId: number;
-  status: "active" | "inactive" | "expired" | "deleted";
+  status:
+    | "draft"
+    | "pending"
+    | "active"
+    | "expired"
+    | "rejected"
+    | "sold"
+    | "inactive"
+    | "deleted";
   images: ListingImage[];
   attributes: ListingAttribute[];
   location?: {

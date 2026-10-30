@@ -144,17 +144,23 @@ interface WillhabenListingsResponse {
   totalNumberOfAdvertDetails: number;
 }
 
+// Map the numeric ad status, which both /myatz/v1/ and /atdetail/v1/ return
+function statusFromId(statusId: number): Listing["status"] {
+  if (statusId === 50 || statusId === 51) return "active";
+  if (statusId === 120) return "sold";
+  if (statusId >= 60 && statusId <= 63) return "expired";
+  if ((statusId >= 80 && statusId <= 87) || (statusId >= 110 && statusId <= 117)) {
+    return "rejected";
+  }
+  if (statusId === 30 || statusId === 31 || statusId === 90) return "pending";
+  if (statusId === 10) return "draft";
+  return "inactive";
+}
+
 // Convert API response to our Listing type (for /myatz/v1/ endpoints)
 function convertToListing(ad: WillhabenAdvert, verticalName: string): Listing {
   const priceAttr = ad.attributes?.attribute.find((a) => a.name === "PRICE");
   const price = priceAttr ? parseFloat(priceAttr.values[0]) : 0;
-
-  const statusMap: Record<string, Listing["status"]> = {
-    active: "active",
-    passive: "expired",
-    sold: "inactive",
-    inactive: "inactive",
-  };
 
   return {
     id: ad.id,
@@ -164,7 +170,7 @@ function convertToListing(ad: WillhabenAdvert, verticalName: string): Listing {
     currency: "EUR",
     category: verticalName,
     categoryId: ad.adTypeId,
-    status: statusMap[ad.advertStatus.id] || "active",
+    status: statusFromId(ad.advertStatus.statusId),
     images:
       ad.advertImageList?.advertImage
         .filter((img) => img.mainImageUrl)
@@ -219,13 +225,6 @@ function convertAdDetailToListing(detail: AdDetailResponse): Listing {
     values: [kv.value],
   })) || [];
 
-  // Map status
-  const statusMap: Record<number, Listing["status"]> = {
-    50: "active",
-    60: "inactive",
-    70: "expired",
-  };
-
   return {
     id: detail.adId,
     title: detail.description,
@@ -234,7 +233,7 @@ function convertAdDetailToListing(detail: AdDetailResponse): Listing {
     currency: "EUR",
     category,
     categoryId: detail.adTypeId,
-    status: statusMap[detail.status.id] || "active",
+    status: statusFromId(detail.status.id),
     images,
     attributes,
     createdAt: new Date().toISOString(),

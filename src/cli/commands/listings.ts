@@ -58,10 +58,14 @@ function formatStatus(status: Listing["status"]): string {
   switch (status) {
     case "active":
       return chalk.green(status);
+    case "draft":
+    case "pending":
     case "inactive":
       return chalk.yellow(status);
     case "expired":
+    case "rejected":
       return chalk.red(status);
+    case "sold":
     case "deleted":
       return chalk.dim(status);
     default:
